@@ -193,6 +193,26 @@ Create a gameplay script template:
 node cli/unity-ai.js /path/to/UnityProject call script.create '{"className":"PlayerController","path":"Assets/Scripts/PlayerController.cs","template":"PlayerController"}'
 ```
 
+Batch mode automatically creates compile phases after `script.create`, so commands that use the new type can stay in one logical JSON request:
+
+```json
+{
+  "commands": [
+    {
+      "tool": "script.createAndAttach",
+      "args": {
+        "className": "EnemyAI",
+        "path": "Assets/Scripts/EnemyAI.cs",
+        "template": "MonoBehaviour",
+        "targetPath": "Enemy"
+      }
+    }
+  ]
+}
+```
+
+`script.createAndAttach` is a CLI batch macro. It expands to `script.create`, waits for Unity to compile/domain reload in the next phase, then runs `component.add` and optional `component.setProperty` commands.
+
 Add physics and mobile controls:
 
 ```bash

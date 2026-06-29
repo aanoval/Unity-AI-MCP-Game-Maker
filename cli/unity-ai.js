@@ -107,6 +107,27 @@ function findUnityExecutable(rest) {
 }
 
 function runUnityBatch(projectPath, commands, rest = []) {
+  const expandedCommands = expandBatchMacros(commands);
+  const phases = splitCompilePhases(expandedCommands);
+  if (phases.length === 1) {
+    return runUnityBatchPhase(projectPath, phases[0], rest);
+  }
+
+  const results = phases.map((phaseCommands, index) => ({
+    phase: index + 1,
+    compileBoundaryAfter: index < phases.length - 1,
+    output: runUnityBatchPhase(projectPath, phaseCommands, rest),
+  }));
+
+  return {
+    ok: true,
+    phased: true,
+    phaseCount: phases.length,
+    results,
+  };
+}
+
+function runUnityBatchPhase(projectPath, commands, rest = []) {
   requireUnityProject(projectPath);
   const unity = findUnityExecutable(rest);
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'unity-ai-batch-'));
@@ -145,6 +166,105 @@ function runUnityBatch(projectPath, commands, rest = []) {
   }
 
   return output;
+}
+
+function expandBatchMacros(commands) {
+  return commands.flatMap((command) => {
+    if (command?.tool !== 'script.createAndAttach') {
+      return [command];
+    }
+
+    const args = command.args ?? {};
+    const className = args.className;
+    if (!className) {
+      throw new Error('script.createAndAttach requires args.className.');
+    }
+
+    const target = {};
+    if (args.targetPath) {
+      target.path = args.targetPath;
+    }
+    if (args.targetName) {
+      target.name = args.targetName;
+    }
+    if (!target.path && !target.name) {
+      throw new Error('script.createAndAttach requires args.targetPath or args.targetName.');
+    }
+
+    const expanded = [
+      {
+        tool: 'script.create',
+        args: {
+          className,
+          path: args.path,
+          template: args.template,
+          content: args.content,
+        },
+      },
+      {
+        tool: 'component.add',
+        args: {
+          ...target,
+          type: className,
+          reuseExisting: args.reuseExisting ?? true,
+        },
+      },
+    ];
+
+    const properties = args.properties ?? args.fields ?? {};
+    for (const [property, value] of Object.entries(properties)) {
+      expanded.push({
+        tool: 'component.setProperty',
+        args: {
+          ...target,
+          type: className,
+          property,
+          value,
+        },
+      });
+    }
+
+    return expanded;
+  });
+}
+
+function splitCompilePhases(commands) {
+  const phases = [];
+  let current = [];
+  let activeScenePath = null;
+
+  for (const command of commands) {
+    if (command?.tool === 'scene.open' && command.args?.path) {
+      activeScenePath = command.args.path;
+    }
+
+    current.push(command);
+    if (requiresCompileBoundary(command)) {
+      if (activeScenePath && !endsWithSceneSave(current)) {
+        current.push({ tool: 'scene.save', args: {} });
+      }
+      phases.push(current);
+      current = [];
+      if (activeScenePath) {
+        current.push({ tool: 'scene.open', args: { path: activeScenePath } });
+      }
+    }
+  }
+
+  if (current.length > 0) {
+    phases.push(current);
+  }
+
+  return phases;
+}
+
+function endsWithSceneSave(commands) {
+  const last = commands.at(-1);
+  return last?.tool === 'scene.save' || last?.tool === 'scene.saveAs';
+}
+
+function requiresCompileBoundary(command) {
+  return command?.tool === 'script.create' || command?.tool === 'sample.runner3D.createScripts';
 }
 
 function readBatchFile(jsonFile) {
