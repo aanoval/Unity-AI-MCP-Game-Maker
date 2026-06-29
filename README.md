@@ -44,6 +44,7 @@ This repository is an early foundation for AI-assisted Unity game creation. It a
 
 - installable Unity Editor package
 - local token-protected HTTP RPC server
+- MCP stdio adapter for MCP-capable AI clients
 - editor control tools for scenes, GameObjects, components, assets, prefabs, cameras, and Unity UI
 - game creation tools for scripts, physics, build settings, playmode, console logs, screenshots, lights, audio, and mobile controls
 - production-grade UI style presets for game menus, HUDs, buttons, joystick controls, and validation
@@ -59,6 +60,7 @@ The Unity package id is `com.alday.unity-ai-game-maker`.
 |-- cli/                                  # Dependency-free local CLI prototype
 |-- docs/                                 # Security, architecture, roadmap
 |-- examples/                             # Example policy and requests
+|-- mcp/                                  # MCP stdio adapter
 |-- packages/
 |   `-- com.alday.unity-ai-game-maker/     # Unity Editor package
 `-- server/                               # MCP adapter notes and future server layer
@@ -98,6 +100,40 @@ The CLI reads the generated token from:
 ```text
 UserSettings/UnityAiGameMaker.json
 ```
+
+## MCP Adapter
+
+Build the MCP stdio adapter:
+
+```bash
+npm install --prefix mcp
+npm --prefix mcp run build
+```
+
+Run it against a Unity project where the package has already generated `UserSettings/UnityAiGameMaker.json`:
+
+```bash
+node mcp/dist/src/server.js --project /path/to/UnityProject
+```
+
+Example MCP client config:
+
+```json
+{
+  "mcpServers": {
+    "unity-ai-game-maker": {
+      "command": "node",
+      "args": [
+        "/path/to/Unity-AI-MCP-Game-Maker/mcp/dist/src/server.js",
+        "--project",
+        "/path/to/UnityProject"
+      ]
+    }
+  }
+}
+```
+
+The adapter exposes schema-validated MCP tools such as `unity_scene_list_open`, `unity_game_object_find`, `unity_ui_button_create`, and `unity_screenshot_capture`. See [mcp/README.md](mcp/README.md).
 
 ## Sample Game
 

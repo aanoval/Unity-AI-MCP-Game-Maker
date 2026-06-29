@@ -1,6 +1,6 @@
 # Architecture
 
-Unity AI MCP Game Maker has three layers.
+Unity AI MCP Game Maker has four layers.
 
 ## 1. Unity Editor Package
 
@@ -51,7 +51,7 @@ or:
 
 This stable local command layer keeps the game-maker toolchain useful even before MCP support is added.
 
-## 3. CLI and Future MCP Adapter
+## 3. CLI
 
 The CLI starts simple:
 
@@ -59,7 +59,29 @@ The CLI starts simple:
 - call the local Unity AI MCP Game Maker server
 - print JSON
 
-The MCP adapter should sit on top of the same command protocol instead of becoming the core. This keeps the system portable across AI clients.
+## 4. MCP Stdio Adapter
+
+The MCP adapter lives at:
+
+```text
+mcp
+```
+
+It sits on top of the same command protocol instead of becoming the core:
+
+```text
+AI client -> MCP stdio -> Unity local HTTP RPC -> Unity Editor package
+```
+
+The adapter owns:
+
+- MCP tool discovery
+- JSON Schema input validation
+- stable MCP-facing tool names
+- policy gates for destructive, Play Mode, and batch-style tools
+- Unity HTTP timeout and error normalization
+
+The Unity Editor package remains the source of truth for editor behavior.
 
 ## Main Thread Rule
 

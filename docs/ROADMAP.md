@@ -30,10 +30,11 @@
 
 ## Phase 4: MCP Adapter
 
-- expose tools through MCP
-- preserve local token auth
-- support stdio first
+- expose tools through MCP [done: stdio adapter]
+- preserve local token auth [done]
+- support stdio first [done]
 - HTTP transport only with explicit auth
+- generate or sync schemas from a future Unity-side tool manifest
 
 ## Phase 5: Release Hardening
 

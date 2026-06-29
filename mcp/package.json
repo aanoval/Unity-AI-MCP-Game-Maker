@@ -1,0 +1,31 @@
+{
+  "name": "unity-ai-mcp-game-maker-server",
+  "version": "0.1.0",
+  "description": "MCP stdio adapter for Unity AI MCP Game Maker.",
+  "type": "module",
+  "bin": {
+    "unity-ai-game-maker-mcp": "./dist/src/server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "prepack": "npm run build",
+    "test": "npm run build && node --test dist/tests/*.test.js"
+  },
+  "files": [
+    "dist/src",
+    "README.md"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "ajv": "^8.17.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.25",
+    "typescript": "^5.9.3"
+  },
+  "license": "MIT"
+}
