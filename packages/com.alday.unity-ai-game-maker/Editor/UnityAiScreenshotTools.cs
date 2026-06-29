@@ -28,6 +28,10 @@ namespace Alday.UnityAiGameMaker.Editor
             if (source.Equals("gameView", StringComparison.OrdinalIgnoreCase))
                 return CaptureFromGameView(args, outputPath, width, height);
 
+            if (source.Equals("playMode", StringComparison.OrdinalIgnoreCase)
+                || source.Equals("game", StringComparison.OrdinalIgnoreCase))
+                return CaptureFromPlayMode(args, outputPath, width, height);
+
             return CaptureFromCamera(args, outputPath, width, height);
         }
 
@@ -225,6 +229,204 @@ namespace Alday.UnityAiGameMaker.Editor
 
             RefreshAssetIfNeeded(outputPath);
             return BuildCaptureResult(outputPath, absolutePath, targetWidth, targetHeight, "gameView", null);
+        }
+
+        static object CaptureFromPlayMode(JObject args, string outputPath, int? width, int? height)
+        {
+            if (!EditorApplication.isPlaying)
+            {
+                throw new InvalidOperationException(
+                    "Play mode capture requires an active Play Mode session. " +
+                    "Use UnityAiScreenshotPlayModeBatch.RunFromEnvironment for batch captures, " +
+                    "or source \"gameView\" while the Unity Editor is open.");
+            }
+
+            var targetWidth = width ?? 1080;
+            var targetHeight = height ?? 1920;
+            (targetWidth, targetHeight) = ClampToTransportLimit(targetWidth, targetHeight);
+            var absolutePath = ToAbsolutePath(outputPath);
+            Directory.CreateDirectory(Path.GetDirectoryName(absolutePath) ?? ".");
+
+            if (TryCaptureGameViewTexture(targetWidth, targetHeight, absolutePath, out var gameViewResult))
+                return gameViewResult;
+
+            var camera = ResolveScreenshotCamera(args);
+            CaptureCameraRender(camera, targetWidth, targetHeight, absolutePath, reuseOverlayConversion: false);
+            RefreshAssetIfNeeded(outputPath);
+            return BuildCaptureResult(outputPath, absolutePath, targetWidth, targetHeight, "playMode", camera);
+        }
+
+        internal static void PrepareGameViewForCapture(int width, int height)
+        {
+            TrySetGameViewSize(width, height);
+            var gameViewType = Type.GetType("UnityEditor.GameView,UnityEditor");
+            var gameView = gameViewType == null ? null : EditorWindow.GetWindow(gameViewType, false, null, true);
+            gameView?.Show(true);
+            gameView?.Repaint();
+            PumpEditorFrames(2);
+        }
+
+        static bool TryCaptureGameViewTexture(int targetWidth, int targetHeight, string absolutePath, out object result)
+        {
+            result = null;
+            var gameViewType = Type.GetType("UnityEditor.GameView,UnityEditor");
+            if (gameViewType == null)
+                return false;
+
+            var gameView = EditorWindow.GetWindow(gameViewType, false, null, true);
+            gameView?.Show(true);
+            gameView?.Repaint();
+            PumpEditorFrames(4);
+
+            var rtField = gameViewType.GetField("m_RenderTexture", BindingFlags.NonPublic | BindingFlags.Instance);
+            var sourceRt = rtField?.GetValue(gameView) as RenderTexture;
+            if (sourceRt == null || !sourceRt.IsCreated())
+                return false;
+
+            var prevActive = RenderTexture.active;
+            RenderTexture scaledRt = null;
+            Texture2D texture = null;
+
+            try
+            {
+                var readSource = sourceRt;
+                if (targetWidth != sourceRt.width || targetHeight != sourceRt.height)
+                {
+                    scaledRt = RenderTexture.GetTemporary(targetWidth, targetHeight, 0, sourceRt.format);
+                    Graphics.Blit(sourceRt, scaledRt);
+                    readSource = scaledRt;
+                }
+
+                RenderTexture.active = readSource;
+                texture = new Texture2D(targetWidth, targetHeight, TextureFormat.RGB24, false);
+                texture.ReadPixels(new Rect(0, 0, targetWidth, targetHeight), 0, 0);
+
+                if (SystemInfo.graphicsUVStartsAtTop)
+                {
+                    var pixels = texture.GetPixels32();
+                    var flipped = new Color32[pixels.Length];
+                    for (var y = 0; y < targetHeight; y++)
+                    {
+                        var srcRow = y * targetWidth;
+                        var dstRow = (targetHeight - 1 - y) * targetWidth;
+                        Array.Copy(pixels, srcRow, flipped, dstRow, targetWidth);
+                    }
+
+                    texture.SetPixels32(flipped);
+                }
+
+                texture.Apply();
+                File.WriteAllBytes(absolutePath, texture.EncodeToPNG());
+            }
+            finally
+            {
+                RenderTexture.active = prevActive;
+                if (scaledRt != null)
+                    RenderTexture.ReleaseTemporary(scaledRt);
+                if (texture != null)
+                    UnityEngine.Object.DestroyImmediate(texture);
+            }
+
+            result = BuildCaptureResult(absolutePath, absolutePath, targetWidth, targetHeight, "playMode", null);
+            return true;
+        }
+
+        static void CaptureCameraRender(
+            Camera camera,
+            int width,
+            int height,
+            string absolutePath,
+            bool reuseOverlayConversion)
+        {
+            var previousTarget = camera.targetTexture;
+            var previousActive = RenderTexture.active;
+            var overlayCanvases = Array.Empty<Canvas>();
+            var previousCanvasCameras = Array.Empty<Camera>();
+            var previousCanvasDistances = Array.Empty<float>();
+
+            if (reuseOverlayConversion)
+            {
+                overlayCanvases = UnityAiTools.AllSceneObjects()
+                    .Select(go => go.GetComponent<Canvas>())
+                    .Where(canvas => canvas != null && canvas.renderMode == RenderMode.ScreenSpaceOverlay)
+                    .ToArray();
+                previousCanvasCameras = overlayCanvases.Select(canvas => canvas.worldCamera).ToArray();
+                previousCanvasDistances = overlayCanvases.Select(canvas => canvas.planeDistance).ToArray();
+            }
+
+            var renderTexture = new RenderTexture(width, height, 24);
+            var texture = new Texture2D(width, height, TextureFormat.RGB24, false);
+
+            try
+            {
+                for (var i = 0; i < overlayCanvases.Length; i++)
+                {
+                    overlayCanvases[i].renderMode = RenderMode.ScreenSpaceCamera;
+                    overlayCanvases[i].worldCamera = camera;
+                    overlayCanvases[i].planeDistance = 1f + i * 0.02f;
+                }
+
+                camera.targetTexture = renderTexture;
+                RenderTexture.active = renderTexture;
+                camera.Render();
+                texture.ReadPixels(new Rect(0, 0, width, height), 0, 0);
+                texture.Apply();
+                File.WriteAllBytes(absolutePath, texture.EncodeToPNG());
+            }
+            finally
+            {
+                for (var i = 0; i < overlayCanvases.Length; i++)
+                {
+                    if (overlayCanvases[i] == null)
+                        continue;
+
+                    overlayCanvases[i].renderMode = RenderMode.ScreenSpaceOverlay;
+                    overlayCanvases[i].worldCamera = previousCanvasCameras[i];
+                    overlayCanvases[i].planeDistance = previousCanvasDistances[i];
+                }
+
+                camera.targetTexture = previousTarget;
+                RenderTexture.active = previousActive;
+                UnityEngine.Object.DestroyImmediate(texture);
+                UnityEngine.Object.DestroyImmediate(renderTexture);
+            }
+        }
+
+        static void PumpEditorFrames(int frames)
+        {
+            for (var i = 0; i < frames; i++)
+            {
+                EditorApplication.QueuePlayerLoopUpdate();
+                SceneView.RepaintAll();
+            }
+        }
+
+        static void TrySetGameViewSize(int width, int height)
+        {
+            var gameViewSizesType = Type.GetType("UnityEditor.GameViewSizes,UnityEditor");
+            var gameViewSizeType = Type.GetType("UnityEditor.GameViewSize,UnityEditor");
+            var gameViewSizeTypeEnum = Type.GetType("UnityEditor.GameViewSizeType,UnityEditor");
+            if (gameViewSizesType == null || gameViewSizeType == null || gameViewSizeTypeEnum == null)
+                return;
+
+            var singleton = gameViewSizesType.GetProperty("instance", BindingFlags.Public | BindingFlags.Static)?.GetValue(null);
+            if (singleton == null)
+                return;
+
+            var currentGroup = gameViewSizesType.GetMethod("GetGroup")?.Invoke(singleton, new object[] { 0 });
+            if (currentGroup == null)
+                return;
+
+            var fixedResolution = Enum.Parse(gameViewSizeTypeEnum, "FixedResolution");
+            var size = Activator.CreateInstance(gameViewSizeType, fixedResolution, width, height, "UnityAiScreenshot");
+            var addCustomSize = currentGroup.GetType().GetMethod("AddCustomSize");
+            addCustomSize?.Invoke(currentGroup, new[] { size });
+            var index = (int)currentGroup.GetType().GetMethod("GetTotalCount")?.Invoke(currentGroup, null)! - 1;
+
+            var gameViewType = Type.GetType("UnityEditor.GameView,UnityEditor");
+            var gameView = EditorWindow.GetWindow(gameViewType, false, null, true);
+            var sizeSelectionCallback = gameViewType?.GetMethod("SizeSelectionCallback", BindingFlags.Instance | BindingFlags.NonPublic);
+            sizeSelectionCallback?.Invoke(gameView, new object[] { index, null });
         }
 
         static void EnsureGraphicsAvailable()
