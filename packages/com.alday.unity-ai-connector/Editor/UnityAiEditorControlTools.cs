@@ -403,14 +403,14 @@ namespace Alday.UnityAiConnector.Editor
             };
         }
 
-        static void ApplyTransform(GameObject go, JObject args)
+        internal static void ApplyTransform(GameObject go, JObject args)
         {
             UnityAiTools.ApplyVector(args["position"], value => go.transform.localPosition = value);
             UnityAiTools.ApplyVector(args["rotation"], value => go.transform.localEulerAngles = value);
             UnityAiTools.ApplyVector(args["scale"], value => go.transform.localScale = value);
         }
 
-        static void ApplyParent(GameObject go, JObject args)
+        internal static void ApplyParent(GameObject go, JObject args)
         {
             var parentPath = args.Value<string>("parentPath");
             if (string.IsNullOrWhiteSpace(parentPath))
@@ -422,7 +422,7 @@ namespace Alday.UnityAiConnector.Editor
             go.transform.SetParent(parent.transform, false);
         }
 
-        static void ApplyCamera(Camera camera, JObject args)
+        internal static void ApplyCamera(Camera camera, JObject args)
         {
             if (args["fieldOfView"] != null)
                 camera.fieldOfView = args.Value<float>("fieldOfView");
@@ -433,7 +433,7 @@ namespace Alday.UnityAiConnector.Editor
             ApplyColor(args["backgroundColor"], color => camera.backgroundColor = color);
         }
 
-        static void ApplyRectTransform(RectTransform rect, JObject args)
+        internal static void ApplyRectTransform(RectTransform rect, JObject args)
         {
             if (args["anchoredPosition"] != null)
                 rect.anchoredPosition = ReadVector2(args["anchoredPosition"], rect.anchoredPosition);
@@ -447,7 +447,7 @@ namespace Alday.UnityAiConnector.Editor
                 rect.pivot = ReadVector2(args["pivot"], rect.pivot);
         }
 
-        static void ApplyColor(JToken token, Action<Color> apply)
+        internal static void ApplyColor(JToken token, Action<Color> apply)
         {
             if (token == null)
                 return;
@@ -458,8 +458,14 @@ namespace Alday.UnityAiConnector.Editor
             apply(new Color(values[0], values[1], values[2], values.Length == 4 ? values[3] : 1f));
         }
 
-        static object ConvertToken(JToken token, Type type)
+        internal static object ConvertToken(JToken token, Type type)
         {
+            if (token == null || token.Type == JTokenType.Null)
+                return type.IsValueType ? Activator.CreateInstance(type) : null;
+
+            if (typeof(UnityEngine.Object).IsAssignableFrom(type))
+                return ResolveUnityObject(token, type);
+
             if (type == typeof(Vector3))
             {
                 var values = token.ToObject<float[]>();
@@ -481,7 +487,7 @@ namespace Alday.UnityAiConnector.Editor
             return token.ToObject(type);
         }
 
-        static Type FindType(string typeName)
+        internal static Type FindType(string typeName)
         {
             var type = AppDomain.CurrentDomain.GetAssemblies()
                 .Select(assembly => assembly.GetType(typeName))
@@ -503,7 +509,7 @@ namespace Alday.UnityAiConnector.Editor
             return type;
         }
 
-        static string RequiredString(JObject args, string name)
+        internal static string RequiredString(JObject args, string name)
         {
             var value = args.Value<string>(name);
             if (string.IsNullOrWhiteSpace(value))
@@ -511,7 +517,7 @@ namespace Alday.UnityAiConnector.Editor
             return value;
         }
 
-        static Vector2 ReadVector2(JToken token, Vector2 fallback)
+        internal static Vector2 ReadVector2(JToken token, Vector2 fallback)
         {
             if (token == null)
                 return fallback;
@@ -522,12 +528,12 @@ namespace Alday.UnityAiConnector.Editor
             return new Vector2(values[0], values[1]);
         }
 
-        static float[] Vector2ToArray(Vector2 value)
+        internal static float[] Vector2ToArray(Vector2 value)
         {
             return new[] { value.x, value.y };
         }
 
-        static float[] ColorToArray(Color value)
+        internal static float[] ColorToArray(Color value)
         {
             return new[] { value.r, value.g, value.b, value.a };
         }
@@ -539,7 +545,7 @@ namespace Alday.UnityAiConnector.Editor
             return (TextAnchor)Enum.Parse(typeof(TextAnchor), value, ignoreCase: true);
         }
 
-        static void EnsureAssetParentFolder(string assetPath)
+        internal static void EnsureAssetParentFolder(string assetPath)
         {
             var folder = System.IO.Path.GetDirectoryName(assetPath)?.Replace("\\", "/");
             if (string.IsNullOrWhiteSpace(folder) || AssetDatabase.IsValidFolder(folder))
@@ -556,7 +562,7 @@ namespace Alday.UnityAiConnector.Editor
             }
         }
 
-        static void EnsureEventSystem()
+        internal static void EnsureEventSystem()
         {
 #if UNITY_6000_0_OR_NEWER
             if (UnityEngine.Object.FindAnyObjectByType<EventSystem>() != null)
@@ -568,7 +574,7 @@ namespace Alday.UnityAiConnector.Editor
             new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
         }
 
-        static void MarkAllScenesDirty()
+        internal static void MarkAllScenesDirty()
         {
             for (var i = 0; i < SceneManager.sceneCount; i++)
             {
@@ -576,6 +582,54 @@ namespace Alday.UnityAiConnector.Editor
                 if (scene.IsValid() && scene.isLoaded)
                     EditorSceneManager.MarkSceneDirty(scene);
             }
+        }
+
+        static object ResolveUnityObject(JToken token, Type type)
+        {
+            string assetPath = null;
+            string objectPath = null;
+            string objectName = null;
+            string componentType = null;
+
+            if (token.Type == JTokenType.String)
+            {
+                assetPath = token.Value<string>();
+                objectPath = assetPath;
+            }
+            else if (token is JObject obj)
+            {
+                assetPath = obj.Value<string>("assetPath");
+                objectPath = obj.Value<string>("path");
+                objectName = obj.Value<string>("name");
+                componentType = obj.Value<string>("componentType");
+            }
+
+            if (!string.IsNullOrWhiteSpace(assetPath))
+            {
+                var asset = AssetDatabase.LoadAssetAtPath(assetPath, type);
+                if (asset != null)
+                    return asset;
+            }
+
+            GameObject go = null;
+            if (!string.IsNullOrWhiteSpace(objectPath))
+                go = UnityAiTools.FindByPath(objectPath);
+            if (go == null && !string.IsNullOrWhiteSpace(objectName))
+                go = UnityAiTools.AllSceneObjects().FirstOrDefault(candidate => candidate.name == objectName);
+
+            if (go != null)
+            {
+                if (type == typeof(GameObject))
+                    return go;
+                if (type == typeof(Transform))
+                    return go.transform;
+                if (typeof(Component).IsAssignableFrom(type))
+                    return go.GetComponent(type);
+                if (!string.IsNullOrWhiteSpace(componentType))
+                    return go.GetComponent(FindType(componentType));
+            }
+
+            return null;
         }
     }
 }

@@ -41,6 +41,7 @@ This repository is an early foundation. It already includes:
 - installable Unity Editor package
 - local token-protected HTTP RPC server
 - editor control tools for scenes, GameObjects, components, assets, prefabs, cameras, and Unity UI
+- game creation tools for scripts, physics, build settings, playmode, console logs, screenshots, lights, audio, and mobile controls
 - dependency-free Node CLI
 - architecture, roadmap, and security docs
 
@@ -121,15 +122,38 @@ The starter Unity package includes:
 - `component.add`
 - `component.list`
 - `component.setField`
+- `component.setProperty`
 - `asset.find`
 - `asset.material.create`
+- `script.create`
+- `physics.rigidbody.add`
+- `physics.rigidbody.set`
+- `physics.collider.add`
+- `physics.collider.set`
+- `scene.buildSettings.set`
+- `playmode.start`
+- `playmode.stop`
+- `console.clear`
+- `console.read`
+- `screenshot.capture`
+- `light.create`
+- `light.set`
+- `audio.source.add`
+- `audio.source.set`
 - `camera.create`
 - `camera.set`
 - `prefab.instantiate`
 - `prefab.createFromGameObject`
+- `prefab.child.create`
+- `prefab.child.delete`
+- `prefab.component.add`
+- `prefab.component.setProperty`
 - `ui.canvas.create`
 - `ui.text.create`
 - `ui.button.create`
+- `ui.virtualButton.create`
+- `ui.joystick.create`
+- `ui.mobileControls.create`
 - `ui.rectTransform.set`
 - `sample.runner3D.createScripts`
 - `sample.runner3D.createContent`
@@ -163,15 +187,24 @@ Instantiate a prefab:
 node cli/unity-ai.js /path/to/UnityProject call prefab.instantiate '{"prefabPath":"Assets/Prefabs/Player.prefab","name":"Player","position":[0,1,0]}'
 ```
 
+Create a gameplay script template:
+
+```bash
+node cli/unity-ai.js /path/to/UnityProject call script.create '{"className":"PlayerController","path":"Assets/Scripts/PlayerController.cs","template":"PlayerController"}'
+```
+
+Add physics and mobile controls:
+
+```bash
+node cli/unity-ai.js /path/to/UnityProject call physics.rigidbody.add '{"path":"Player","mass":1,"useGravity":true}'
+node cli/unity-ai.js /path/to/UnityProject call physics.collider.add '{"path":"Player","collider":"Capsule","height":1.8,"radius":0.45}'
+node cli/unity-ai.js /path/to/UnityProject call ui.mobileControls.create '{"parentPath":"Gameplay Canvas"}'
+```
+
 ## Roadmap
 
 Near-term:
 
-- prefab open/save/instantiate tools
-- UI Canvas mapping helpers
-- screenshot tools
-- console log capture
-- playmode control
 - policy file enforcement
 - MCP adapter over the local command core
 
