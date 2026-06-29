@@ -15,12 +15,30 @@ namespace Alday.UnityAiConnector.Editor
         public static readonly string[] ToolNames =
         {
             "scene.listOpen",
+            "scene.open",
+            "scene.create",
             "scene.save",
+            "scene.saveAs",
+            "scene.hierarchy",
             "gameObject.find",
             "gameObject.create",
+            "gameObject.delete",
             "gameObject.setTransform",
+            "gameObject.setActive",
+            "gameObject.setParent",
+            "component.add",
             "component.list",
+            "component.setField",
             "asset.find",
+            "asset.material.create",
+            "camera.create",
+            "camera.set",
+            "prefab.instantiate",
+            "prefab.createFromGameObject",
+            "ui.canvas.create",
+            "ui.text.create",
+            "ui.button.create",
+            "ui.rectTransform.set",
             "sample.runner3D.createScripts",
             "sample.runner3D.createContent"
         };
@@ -33,12 +51,30 @@ namespace Alday.UnityAiConnector.Editor
             return tool switch
             {
                 "scene.listOpen" => ListOpenScenes(),
+                "scene.open" => UnityAiEditorControlTools.OpenScene(args),
+                "scene.create" => UnityAiEditorControlTools.CreateScene(args),
                 "scene.save" => SaveScene(args),
+                "scene.saveAs" => UnityAiEditorControlTools.SaveSceneAs(args),
+                "scene.hierarchy" => UnityAiEditorControlTools.SceneHierarchy(args),
                 "gameObject.find" => FindGameObjects(args),
                 "gameObject.create" => CreateGameObject(args),
+                "gameObject.delete" => UnityAiEditorControlTools.DeleteGameObject(args),
                 "gameObject.setTransform" => SetTransform(args),
+                "gameObject.setActive" => UnityAiEditorControlTools.SetActive(args),
+                "gameObject.setParent" => UnityAiEditorControlTools.SetParent(args),
+                "component.add" => UnityAiEditorControlTools.AddComponent(args),
                 "component.list" => ListComponents(args),
+                "component.setField" => UnityAiEditorControlTools.SetComponentField(args),
                 "asset.find" => FindAssets(args),
+                "asset.material.create" => UnityAiEditorControlTools.CreateMaterial(args),
+                "camera.create" => UnityAiEditorControlTools.CreateCamera(args),
+                "camera.set" => UnityAiEditorControlTools.SetCamera(args),
+                "prefab.instantiate" => UnityAiEditorControlTools.InstantiatePrefab(args),
+                "prefab.createFromGameObject" => UnityAiEditorControlTools.CreatePrefabFromGameObject(args),
+                "ui.canvas.create" => UnityAiEditorControlTools.CreateCanvas(args),
+                "ui.text.create" => UnityAiEditorControlTools.CreateText(args),
+                "ui.button.create" => UnityAiEditorControlTools.CreateButton(args),
+                "ui.rectTransform.set" => UnityAiEditorControlTools.SetRectTransform(args),
                 "sample.runner3D.createScripts" => UnityAiRunner3DSampleBuilder.CreateScripts(),
                 "sample.runner3D.createContent" => UnityAiRunner3DSampleBuilder.CreateContent(),
                 _ => throw new InvalidOperationException($"Unknown tool: {tool}")
@@ -177,7 +213,7 @@ namespace Alday.UnityAiConnector.Editor
                 .ToArray();
         }
 
-        static GameObject ResolveTarget(JObject args)
+        internal static GameObject ResolveTarget(JObject args)
         {
             var path = args.Value<string>("path");
             if (!string.IsNullOrWhiteSpace(path))
@@ -198,7 +234,7 @@ namespace Alday.UnityAiConnector.Editor
             throw new InvalidOperationException("Target GameObject not found. Provide path or name.");
         }
 
-        static void ApplyVector(JToken token, Action<Vector3> apply)
+        internal static void ApplyVector(JToken token, Action<Vector3> apply)
         {
             if (token == null)
                 return;
@@ -210,24 +246,24 @@ namespace Alday.UnityAiConnector.Editor
             apply(new Vector3(values[0], values[1], values[2]));
         }
 
-        static float[] ToArray(Vector3 value)
+        internal static float[] ToArray(Vector3 value)
         {
             return new[] { value.x, value.y, value.z };
         }
 
-        static IEnumerable<GameObject> AllSceneObjects()
+        internal static IEnumerable<GameObject> AllSceneObjects()
         {
             return Resources.FindObjectsOfTypeAll<GameObject>()
                 .Where(go => go.scene.IsValid())
                 .Where(go => !EditorUtility.IsPersistent(go));
         }
 
-        static GameObject FindByPath(string path)
+        internal static GameObject FindByPath(string path)
         {
             return AllSceneObjects().FirstOrDefault(go => GetPath(go) == path);
         }
 
-        static string GetPath(GameObject go)
+        internal static string GetPath(GameObject go)
         {
             var names = new Stack<string>();
             var current = go.transform;
@@ -240,7 +276,7 @@ namespace Alday.UnityAiConnector.Editor
             return string.Join("/", names);
         }
 
-        static string GetObjectId(UnityEngine.Object target)
+        internal static string GetObjectId(UnityEngine.Object target)
         {
 #if UNITY_6000_0_OR_NEWER
             return target.GetEntityId().ToString();

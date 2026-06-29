@@ -40,7 +40,7 @@ This repository is an early foundation. It already includes:
 
 - installable Unity Editor package
 - local token-protected HTTP RPC server
-- starter tools for scene, GameObject, component, asset, and transform operations
+- editor control tools for scenes, GameObjects, components, assets, prefabs, cameras, and Unity UI
 - dependency-free Node CLI
 - architecture, roadmap, and security docs
 
@@ -107,12 +107,30 @@ The sample is generated through connector batch tools and includes:
 The starter Unity package includes:
 
 - `scene.listOpen`
+- `scene.open`
+- `scene.create`
 - `scene.save`
+- `scene.saveAs`
+- `scene.hierarchy`
 - `gameObject.find`
 - `gameObject.create`
+- `gameObject.delete`
 - `gameObject.setTransform`
+- `gameObject.setActive`
+- `gameObject.setParent`
+- `component.add`
 - `component.list`
+- `component.setField`
 - `asset.find`
+- `asset.material.create`
+- `camera.create`
+- `camera.set`
+- `prefab.instantiate`
+- `prefab.createFromGameObject`
+- `ui.canvas.create`
+- `ui.text.create`
+- `ui.button.create`
+- `ui.rectTransform.set`
 - `sample.runner3D.createScripts`
 - `sample.runner3D.createContent`
 
@@ -125,6 +143,24 @@ The protocol is intentionally boring JSON:
     "name": "Canvas"
   }
 }
+```
+
+Create and position a UI button:
+
+```bash
+node cli/unity-ai.js /path/to/UnityProject call ui.button.create '{"parentPath":"Canvas","name":"Play Button","text":"PLAY","anchoredPosition":[0,-40],"sizeDelta":[220,64]}'
+```
+
+Open a scene before editing it:
+
+```bash
+node cli/unity-ai.js /path/to/UnityProject call scene.open '{"path":"Assets/Scenes/MainMenu.unity"}'
+```
+
+Instantiate a prefab:
+
+```bash
+node cli/unity-ai.js /path/to/UnityProject call prefab.instantiate '{"prefabPath":"Assets/Prefabs/Player.prefab","name":"Player","position":[0,1,0]}'
 ```
 
 ## Roadmap
