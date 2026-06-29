@@ -10,7 +10,9 @@ Tools > Unity AI Game Maker > Stop Local Server
 Tools > Unity AI Game Maker > Print Token
 Tools > Unity AI Game Maker > Open Config
 Tools > Unity AI Game Maker > Run Batch File...
-Tools > Unity AI Game Maker > Capture Menu Screenshots
+Tools > Unity AI Game Maker > Capture Menu Screenshots (Editor Camera)
+Tools > Unity AI Game Maker > Capture Menu Screenshots (Play Mode)
+Tools > Unity AI Game Maker > Run Play Mode Screenshot Batch
 ```
 
 ## Config
@@ -21,7 +23,7 @@ Generated config path:
 UserSettings/UnityAiGameMaker.json
 ```
 
-Defaults in `0.3.0+`:
+Defaults in `0.4.0+`:
 
 - `autoStart: true` — local HTTP server starts when Unity Editor loads
 - `bindHost: 127.0.0.1`
@@ -70,6 +72,14 @@ Important: do **not** use `-nographics` for screenshot tools. Unity needs a grap
 
 ## Screenshot Tools
 
+Choose the capture mode that fits your goal:
+
+| Mode | `source` / entry point | Best for | Speed | Quality |
+|------|------------------------|----------|-------|---------|
+| Editor camera | `camera` (default) | Menu/UI scenes, sharp PNGs | Fast | High |
+| Play game | `playMode` or `game` | Runtime bootstrap, gameplay systems | Slower | Game View based |
+| Game View (editor open) | `gameView` | Manual review while Unity is open | Medium | Depends on Game View size |
+
 ### `screenshot.capture`
 
 Capture the active scene to PNG.
@@ -92,14 +102,18 @@ Args:
 - `outputPath` — destination PNG (preferred)
 - `path` — legacy alias for `outputPath`
 - `width`, `height` — output size
-- `source` — `camera` (default) or `gameView`
+- `source` — `camera` (default), `playMode` / `game`, or `gameView`
 - `cameraPath` — hierarchy path to a Camera GameObject
 
-`source: "gameView"` reads the Unity Editor Game View render texture. It is best for interactive editor review. Batch captures should use `source: "camera"`.
+`source: "camera"` renders directly at the requested resolution. This is the recommended default for menu/UI screenshots.
+
+`source: "playMode"` requires an active Play Mode session. For batch automation, use the play mode batch runner below.
+
+`source: "gameView"` reads the Unity Editor Game View render texture. It is best for interactive editor review while Unity is open.
 
 ### `screenshots.captureScenes`
 
-Open multiple scenes and capture each one.
+Open multiple scenes and capture each one using the **editor camera** path.
 
 ```json
 {
@@ -117,21 +131,48 @@ Open multiple scenes and capture each one.
 Filters:
 
 - `menu` — scenes named `Menu_*`, `Main_Menu`, or `MainMenu`
+- `menusandgameplay` — menu scenes plus scenes containing `Gameplay`
 - `buildSettings` — all enabled scenes in Build Settings
 - `gameplay` — scenes containing `Gameplay`
 - `all` — same as `buildSettings`
 
-CLI shortcut:
+Editor camera CLI:
 
 ```bash
 node cli/unity-ai.js /path/to/UnityProject capture-scenes \
   --output ../menu-screenshots \
   --filter menu \
-  --width 1080 \
-  --height 1920
+  --source camera
 ```
 
-Batch macro:
+Play mode CLI:
+
+```bash
+node cli/unity-ai.js /path/to/UnityProject capture-scenes \
+  --output ../menu-screenshots \
+  --filter menusandgameplay \
+  --source playMode \
+  --wait-frames 30
+```
+
+Play mode batch entry point:
+
+```bash
+UNITY_AI_GAME_MAKER_BATCH_FILE=/tmp/playmode.json \
+UNITY_AI_GAME_MAKER_BATCH_OUT=/tmp/playmode.out.json \
+/Applications/Unity/Hub/Editor/6000.5.1f1/Unity.app/Contents/MacOS/Unity \
+  -batchmode \
+  -projectPath /path/to/UnityProject \
+  -executeMethod Alday.UnityAiGameMaker.Editor.UnityAiScreenshotPlayModeBatch.RunFromEnvironment
+```
+
+Notes:
+
+- Do **not** pass `source: playMode` to the regular `UnityAiGameMakerBatch` runner.
+- Play mode batch keeps Unity open until all scenes finish, then calls `EditorApplication.Exit(0)`.
+- Do **not** use `-nographics` or `-quit` with the play mode batch runner.
+
+Batch macros:
 
 ```json
 {
@@ -139,7 +180,22 @@ Batch macro:
     {
       "tool": "screenshots.captureMenus",
       "args": {
-        "output": "../menu-screenshots"
+        "output": "../menu-screenshots",
+        "source": "camera"
+      }
+    }
+  ]
+}
+```
+
+```json
+{
+  "commands": [
+    {
+      "tool": "screenshots.captureMenusPlayMode",
+      "args": {
+        "output": "../menu-screenshots",
+        "waitFrames": 30
       }
     }
   ]

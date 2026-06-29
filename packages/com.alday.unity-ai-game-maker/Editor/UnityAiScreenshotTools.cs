@@ -39,6 +39,16 @@ namespace Alday.UnityAiGameMaker.Editor
         {
             EnsureGraphicsAvailable();
 
+            var source = (args.Value<string>("source") ?? "camera").Trim();
+            if (IsPlayModeSource(source))
+            {
+                throw new InvalidOperationException(
+                    "screenshots.captureScenes with source \"" + source + "\" requires play mode batch. " +
+                    "Use UnityAiScreenshotPlayModeBatch.RunFromEnvironment, " +
+                    "Tools > Unity AI Game Maker > Capture Menu Screenshots (Play Mode), " +
+                    "or: node cli/unity-ai.js <project> capture-scenes --source playMode");
+            }
+
             var scenePaths = ResolveScenePaths(args);
             if (scenePaths.Length == 0)
                 throw new InvalidOperationException("No scenes matched the requested filter.");
@@ -48,7 +58,6 @@ namespace Alday.UnityAiGameMaker.Editor
 
             var width = args.Value<int?>("width") ?? 1080;
             var height = args.Value<int?>("height") ?? 1920;
-            var source = args.Value<string>("source") ?? "camera";
             var namePattern = args.Value<string>("namePattern") ?? "{sceneName}";
             var captures = new List<object>();
 
@@ -427,6 +436,12 @@ namespace Alday.UnityAiGameMaker.Editor
             var gameView = EditorWindow.GetWindow(gameViewType, false, null, true);
             var sizeSelectionCallback = gameViewType?.GetMethod("SizeSelectionCallback", BindingFlags.Instance | BindingFlags.NonPublic);
             sizeSelectionCallback?.Invoke(gameView, new object[] { index, null });
+        }
+
+        static bool IsPlayModeSource(string source)
+        {
+            return source.Equals("playMode", StringComparison.OrdinalIgnoreCase)
+                || source.Equals("game", StringComparison.OrdinalIgnoreCase);
         }
 
         static void EnsureGraphicsAvailable()

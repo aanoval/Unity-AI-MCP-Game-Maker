@@ -87,6 +87,63 @@ namespace Alday.UnityAiGameMaker.Editor
             Begin(inputPath, outPath);
         }
 
+        public static void BeginCaptureScenes(JObject args, string outFile)
+        {
+            var outputDir = args.Value<string>("outputDir") ?? args.Value<string>("output")
+                ?? Path.GetFullPath(Path.Combine(UnityAiGameMakerConfig.ProjectRoot, "..", "screenshots"));
+            var width = args.Value<int?>("width") ?? 1080;
+            var height = args.Value<int?>("height") ?? 1920;
+            var waitFrames = args.Value<int?>("waitFrames") ?? 30;
+            var cameraPath = args.Value<string>("cameraPath") ?? "";
+            var scenePaths = args["scenes"]?.ToObject<string[]>();
+            if (scenePaths == null || scenePaths.Length == 0)
+            {
+                var filter = args.Value<string>("filter") ?? "menu";
+                scenePaths = ResolveScenePathsFromFilter(filter);
+            }
+
+            var payload = new JObject
+            {
+                ["commands"] = new JArray
+                {
+                    new JObject
+                    {
+                        ["tool"] = "screenshots.captureScenes",
+                        ["args"] = new JObject
+                        {
+                            ["scenes"] = new JArray(scenePaths),
+                            ["outputDir"] = outputDir,
+                            ["width"] = width,
+                            ["height"] = height,
+                            ["waitFrames"] = waitFrames,
+                            ["cameraPath"] = string.IsNullOrWhiteSpace(cameraPath) ? null : cameraPath
+                        }
+                    }
+                }
+            };
+
+            var tempRoot = Path.Combine(UnityAiGameMakerConfig.ProjectRoot, "Temp", "UnityAiGameMaker");
+            Directory.CreateDirectory(tempRoot);
+            var inputPath = Path.Combine(tempRoot, "playmode-menu-capture.json");
+            File.WriteAllText(inputPath, payload.ToString(Formatting.Indented));
+            Begin(inputPath, outFile);
+        }
+
+        [MenuItem("Tools/Unity AI Game Maker/Capture Menu Screenshots (Play Mode)")]
+        public static void CaptureMenuScreenshotsPlayModeFromMenu()
+        {
+            var outputDir = Path.GetFullPath(Path.Combine(UnityAiGameMakerConfig.ProjectRoot, "..", "screenshots"));
+            var outFile = Path.Combine(outputDir, "playmode-capture.out.json");
+            BeginCaptureScenes(new JObject
+            {
+                ["filter"] = "menusandgameplay",
+                ["outputDir"] = outputDir,
+                ["width"] = 1080,
+                ["height"] = 1920,
+                ["waitFrames"] = 30
+            }, outFile);
+        }
+
         static void Begin(string inputPath, string outFile)
         {
             ClearStateFile();

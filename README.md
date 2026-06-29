@@ -89,7 +89,8 @@ node cli/unity-ai.js /path/to/UnityProject health
 node cli/unity-ai.js /path/to/UnityProject tools
 node cli/unity-ai.js /path/to/UnityProject call scene.listOpen '{}'
 node cli/unity-ai.js /path/to/UnityProject unity-batch ./examples/batch.menu-screenshots.json
-node cli/unity-ai.js /path/to/UnityProject capture-scenes --output ../menu-screenshots --filter menu
+node cli/unity-ai.js /path/to/UnityProject capture-scenes --output ../menu-screenshots --filter menu --source camera
+node cli/unity-ai.js /path/to/UnityProject capture-scenes --output ../menu-screenshots --filter menusandgameplay --source playMode
 ```
 
 The CLI reads the generated token from:
@@ -210,24 +211,37 @@ Recommended UI workflow for agents:
 Capture all menu scenes without a running HTTP server:
 
 ```bash
-node cli/unity-ai.js /path/to/UnityProject capture-scenes --output ../menu-screenshots --filter menu --width 1080 --height 1920
+# Sharp editor-camera captures (recommended for menus/UI)
+node cli/unity-ai.js /path/to/UnityProject capture-scenes --output ../menu-screenshots --filter menu --source camera
+
+# Play Mode captures (runtime bootstrap / gameplay)
+node cli/unity-ai.js /path/to/UnityProject capture-scenes --output ../menu-screenshots --filter menusandgameplay --source playMode
 ```
+
+Screenshot modes:
+
+- `camera` — editor camera render, fast and sharp (default)
+- `playMode` / `game` — enters Play Mode per scene via `UnityAiScreenshotPlayModeBatch`
+- `gameView` — reads Game View while Unity Editor is open
 
 Screenshot args:
 
 - `outputPath` — preferred PNG destination
 - `path` — legacy alias for `outputPath`
-- `source` — `camera` (batch-safe) or `gameView` (editor Game View)
+- `source` — `camera`, `playMode`, `game`, or `gameView`
 - `cameraPath` — camera hierarchy path, separate from output path
 
-Batch mode entry point:
+Batch mode entry points:
 
 ```bash
+# Editor camera batch
 Unity -batchmode -quit \
   -executeMethod Alday.UnityAiGameMaker.Editor.UnityAiGameMakerBatch.RunFromEnvironment
-```
 
-Do not use `-nographics` when running screenshot tools.
+# Play Mode batch (Unity exits automatically when done)
+Unity -batchmode \
+  -executeMethod Alday.UnityAiGameMaker.Editor.UnityAiScreenshotPlayModeBatch.RunFromEnvironment
+```
 
 Open a scene before editing it:
 

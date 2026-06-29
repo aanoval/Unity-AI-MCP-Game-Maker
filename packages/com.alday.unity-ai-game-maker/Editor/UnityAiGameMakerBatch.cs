@@ -45,7 +45,7 @@ namespace Alday.UnityAiGameMaker.Editor
             }
         }
 
-        [MenuItem("Tools/Unity AI Game Maker/Capture Menu Screenshots")]
+        [MenuItem("Tools/Unity AI Game Maker/Capture Menu Screenshots (Editor Camera)")]
         public static void CaptureMenuScreenshotsFromMenu()
         {
             try
