@@ -2,7 +2,8 @@
   "name": "Alday.UnityAiConnector.Editor",
   "rootNamespace": "Alday.UnityAiConnector.Editor",
   "references": [
-    "Unity.Newtonsoft.Json"
+    "Unity.Newtonsoft.Json",
+    "UnityEngine.UI"
   ],
   "includePlatforms": [
     "Editor"

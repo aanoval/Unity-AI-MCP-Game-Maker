@@ -86,6 +86,22 @@ The CLI reads the generated token from:
 UserSettings/UnityAiConnector.json
 ```
 
+## Sample Game
+
+Create a complete 3D runner sample in a fresh Unity 6000.5 project:
+
+```bash
+node cli/unity-ai.js /path/to/UnityProject sample-runner3d --unity /Applications/Unity/Hub/Editor/6000.5.1f1/Unity.app/Contents/MacOS/Unity
+```
+
+The sample is generated through connector batch tools and includes:
+
+- `MainMenu` and `Gameplay` scenes
+- camera, lights, Canvas UI, EventSystem
+- player, coin, obstacle, and goal prefabs
+- generated materials using Unity primitives only
+- runtime scripts for movement, scoring, collisions, camera follow, and menu flow
+
 ## First Tool Surface
 
 The starter Unity package includes:
@@ -97,6 +113,8 @@ The starter Unity package includes:
 - `gameObject.setTransform`
 - `component.list`
 - `asset.find`
+- `sample.runner3D.createScripts`
+- `sample.runner3D.createContent`
 
 The protocol is intentionally boring JSON:
 

@@ -20,7 +20,9 @@ namespace Alday.UnityAiConnector.Editor
             "gameObject.create",
             "gameObject.setTransform",
             "component.list",
-            "asset.find"
+            "asset.find",
+            "sample.runner3D.createScripts",
+            "sample.runner3D.createContent"
         };
 
         public static object Invoke(string tool, JObject args, UnityAiConnectorConfig config)
@@ -37,6 +39,8 @@ namespace Alday.UnityAiConnector.Editor
                 "gameObject.setTransform" => SetTransform(args),
                 "component.list" => ListComponents(args),
                 "asset.find" => FindAssets(args),
+                "sample.runner3D.createScripts" => UnityAiRunner3DSampleBuilder.CreateScripts(),
+                "sample.runner3D.createContent" => UnityAiRunner3DSampleBuilder.CreateContent(),
                 _ => throw new InvalidOperationException($"Unknown tool: {tool}")
             };
         }

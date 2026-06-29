@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const PACKAGE_ID = 'com.alday.unity-ai-connector';
@@ -20,6 +22,8 @@ function usage() {
   unity-ai <projectPath> install [--package-path <path>]
   unity-ai <projectPath> config
   unity-ai <projectPath> doctor
+  unity-ai <projectPath> unity-batch <jsonFile> [--unity <path>]
+  unity-ai <projectPath> sample-runner3d [--unity <path>]
   unity-ai <projectPath> health
   unity-ai <projectPath> tools
   unity-ai <projectPath> call <tool> <jsonArgs>
@@ -28,6 +32,7 @@ Examples:
   unity-ai /path/to/project install
   unity-ai /path/to/project config
   unity-ai /path/to/project doctor
+  unity-ai /path/to/project sample-runner3d --unity /Applications/Unity/Hub/Editor/6000.5.1f1/Unity.app/Contents/MacOS/Unity
   unity-ai /path/to/project health
   unity-ai /path/to/project tools
   unity-ai /path/to/project call scene.listOpen '{}'
@@ -76,6 +81,100 @@ function parseFlagValue(args, flagName) {
   }
 
   return args[index + 1];
+}
+
+function findUnityExecutable(rest) {
+  const requested = parseFlagValue(rest, '--unity') ?? process.env.UNITY_EXECUTABLE;
+  if (requested) {
+    if (!fs.existsSync(requested)) {
+      throw new Error(`Unity executable not found: ${requested}`);
+    }
+    return requested;
+  }
+
+  const candidates = [
+    '/Applications/Unity/Hub/Editor/6000.5.1f1/Unity.app/Contents/MacOS/Unity',
+    '/Applications/Unity/Unity-6000.5.1f1/Unity.app/Contents/MacOS/Unity',
+    '/Applications/Unity/Unity.app/Contents/MacOS/Unity',
+  ];
+
+  const found = candidates.find((candidate) => fs.existsSync(candidate));
+  if (!found) {
+    throw new Error('Unity executable not found. Pass --unity <path> or set UNITY_EXECUTABLE.');
+  }
+
+  return found;
+}
+
+function runUnityBatch(projectPath, commands, rest = []) {
+  requireUnityProject(projectPath);
+  const unity = findUnityExecutable(rest);
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'unity-ai-batch-'));
+  const batchFile = path.join(tempRoot, 'commands.json');
+  const outputFile = path.join(tempRoot, 'result.json');
+
+  writeJson(batchFile, { commands });
+
+  const result = spawnSync(unity, [
+    '-batchmode',
+    '-quit',
+    '-projectPath',
+    projectPath,
+    '-executeMethod',
+    'Alday.UnityAiConnector.Editor.UnityAiConnectorBatch.RunFromEnvironment',
+    '-logFile',
+    '-'
+  ], {
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      UNITY_AI_CONNECTOR_BATCH_FILE: batchFile,
+      UNITY_AI_CONNECTOR_BATCH_OUT: outputFile,
+    },
+    maxBuffer: 1024 * 1024 * 20,
+  });
+
+  const output = fs.existsSync(outputFile) ? readJson(outputFile) : null;
+  if (result.status !== 0) {
+    const tail = `${result.stdout ?? ''}\n${result.stderr ?? ''}`.split('\n').slice(-80).join('\n');
+    throw new Error(`Unity batch failed with exit code ${result.status}.\n${tail}`);
+  }
+
+  if (!output?.ok) {
+    throw new Error(`Unity batch command failed: ${JSON.stringify(output, null, 2)}`);
+  }
+
+  return output;
+}
+
+function readBatchFile(jsonFile) {
+  const payload = readJson(path.resolve(jsonFile));
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+  if (Array.isArray(payload.commands)) {
+    return payload.commands;
+  }
+  throw new Error('Batch JSON must be an array or an object with a commands array.');
+}
+
+function createRunner3DSample(projectPath, rest) {
+  const install = installPackage(projectPath, rest);
+  const scripts = runUnityBatch(projectPath, [
+    { tool: 'sample.runner3D.createScripts', args: {} }
+  ], rest);
+  const content = runUnityBatch(projectPath, [
+    { tool: 'sample.runner3D.createContent', args: {} }
+  ], rest);
+
+  return {
+    ok: true,
+    install,
+    scripts,
+    content,
+    projectPath,
+    nextStep: 'Open the Unity project and play Assets/UnityAiConnectorSample/Scenes/MainMenu.unity.'
+  };
 }
 
 function installPackage(projectPath, rest) {
@@ -189,6 +288,20 @@ async function main() {
 
   if (command === 'doctor') {
     console.log(JSON.stringify(await doctor(projectPath), null, 2));
+    return;
+  }
+
+  if (command === 'unity-batch') {
+    const [jsonFile] = rest;
+    if (!jsonFile) {
+      throw new Error('Missing batch JSON file.');
+    }
+    console.log(JSON.stringify(runUnityBatch(projectPath, readBatchFile(jsonFile), rest.slice(1)), null, 2));
+    return;
+  }
+
+  if (command === 'sample-runner3d') {
+    console.log(JSON.stringify(createRunner3DSample(projectPath, rest), null, 2));
     return;
   }
 
