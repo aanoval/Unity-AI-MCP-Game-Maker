@@ -1,0 +1,18 @@
+{
+  "network": {
+    "bindHost": "127.0.0.1"
+  },
+  "auth": {
+    "required": true
+  },
+  "tools": {
+    "scene.*": true,
+    "gameObject.*": true,
+    "component.*": true,
+    "asset.find": true,
+    "asset.delete": false,
+    "package.remove": false,
+    "script.execute": false,
+    "reflection.call": false
+  }
+}

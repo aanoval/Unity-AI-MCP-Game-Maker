@@ -1,0 +1,17 @@
+.DS_Store
+node_modules/
+dist/
+coverage/
+*.log
+
+# Unity generated folders when this package is tested inside a project.
+Library/
+Temp/
+Obj/
+Build/
+Builds/
+Logs/
+UserSettings/
+
+# Keep reference repositories as submodules only.
+references/*/.git

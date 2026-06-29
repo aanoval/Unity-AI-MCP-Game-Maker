@@ -1,0 +1,21 @@
+{
+  "name": "com.alday.unity-ai-connector",
+  "displayName": "Unity AI Connector",
+  "version": "0.1.0",
+  "unity": "2022.3",
+  "description": "Secure local AI connector for Unity Editor automation.",
+  "author": {
+    "name": "Alday Global"
+  },
+  "license": "MIT",
+  "keywords": [
+    "unity",
+    "ai",
+    "mcp",
+    "editor",
+    "automation"
+  ],
+  "dependencies": {
+    "com.unity.nuget.newtonsoft-json": "3.2.1"
+  }
+}

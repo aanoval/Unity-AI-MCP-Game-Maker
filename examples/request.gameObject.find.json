@@ -1,0 +1,6 @@
+{
+  "tool": "gameObject.find",
+  "args": {
+    "name": "Canvas"
+  }
+}

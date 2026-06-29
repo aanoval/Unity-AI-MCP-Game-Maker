@@ -1,0 +1,16 @@
+{
+  "name": "unity-ai-mcp-connector-cli",
+  "version": "0.1.0",
+  "description": "Dependency-free CLI prototype for Unity AI MCP Connector.",
+  "type": "module",
+  "bin": {
+    "unity-ai": "./unity-ai.js"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "check": "node --check unity-ai.js"
+  }
+}

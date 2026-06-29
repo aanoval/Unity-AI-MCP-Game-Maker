@@ -1,0 +1,6 @@
+[submodule "references/ivanmurzak-unity-mcp"]
+	path = references/ivanmurzak-unity-mcp
+	url = https://github.com/IvanMurzak/Unity-MCP.git
+[submodule "references/akiojin-unity-cli"]
+	path = references/akiojin-unity-cli
+	url = https://github.com/akiojin/unity-cli.git
