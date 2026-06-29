@@ -38,11 +38,12 @@ async function main(): Promise<void> {
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const startedAt = Date.now();
-    const tool = getTool(request.params.name);
-    const args = validateToolArguments(tool, request.params.arguments);
-    assertToolAllowed(tool, config);
 
     try {
+      const tool = getTool(request.params.name);
+      const args = validateToolArguments(tool, request.params.arguments);
+      assertToolAllowed(tool, config);
+
       const result = tool.name === "unity_health"
         ? await client.health()
         : tool.name === "unity_list_tools"
@@ -59,7 +60,7 @@ async function main(): Promise<void> {
         ]
       };
     } catch (error) {
-      log(`${tool.name} failed ${Date.now() - startedAt}ms ${formatError(error)}`);
+      log(`${request.params.name} failed ${Date.now() - startedAt}ms ${formatError(error)}`);
       return {
         isError: true,
         content: [

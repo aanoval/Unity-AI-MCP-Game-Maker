@@ -164,6 +164,9 @@ namespace Alday.UnityAiGameMaker.Editor
             if (!scene.IsValid())
                 throw new InvalidOperationException("Scene not found.");
 
+            if (string.IsNullOrWhiteSpace(scene.path))
+                throw new InvalidOperationException("Active scene has not been saved to disk yet. Use scene.saveAs with a path first.");
+
             var saved = EditorSceneManager.SaveScene(scene);
             return new { saved, scene.path };
         }

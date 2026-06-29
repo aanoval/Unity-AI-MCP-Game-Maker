@@ -5,6 +5,7 @@ import { getTool, toolDefinitions, validateToolArguments } from "../src/tool-reg
 test("tool registry exposes stable MCP names with Unity mappings", () => {
   assert.ok(toolDefinitions.length >= 40);
   assert.equal(getTool("unity_scene_list_open").unityTool, "scene.listOpen");
+  assert.equal(getTool("unity_scene_save_as").unityTool, "scene.saveAs");
   assert.equal(getTool("unity_ui_button_create").unityTool, "ui.button.create");
   assert.equal(getTool("unity_health").unityTool, null);
 });

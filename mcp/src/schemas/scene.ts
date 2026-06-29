@@ -39,6 +39,16 @@ export const sceneTools: ToolDefinition[] = [
     risk: "write"
   },
   {
+    name: "unity_scene_save_as",
+    unityTool: "scene.saveAs",
+    description: "Save the active scene, or a loaded source scene, to a scene asset path.",
+    inputSchema: objectSchema({
+      path: { type: "string", minLength: 1 },
+      sourcePath: { type: "string", minLength: 1 }
+    }, ["path"]),
+    risk: "write"
+  },
+  {
     name: "unity_scene_hierarchy",
     unityTool: "scene.hierarchy",
     description: "Inspect scene hierarchy with components and transform metadata.",
