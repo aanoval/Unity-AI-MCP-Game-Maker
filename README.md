@@ -1,23 +1,27 @@
-# Unity AI MCP Connector
+# Unity AI MCP Game Maker
 
-Secure local AI control for the Unity Editor.
+Secure local AI game-making tools for the Unity Editor.
 
-Unity AI MCP Connector is a lightweight Unity Editor bridge designed for AI coding agents that need to inspect and edit Unity projects without turning the editor into an unsafe remote shell.
+Unity AI MCP Game Maker is a lightweight Unity Editor toolchain for AI coding agents that need to build Unity games: create scenes, prefabs, gameplay scripts, mobile UI, screenshots, validators, and production-minded game objects without turning the editor into an unsafe remote shell.
 
-The goal is simple: keep the workflow fast, expand toward full asset and scene coverage, and keep dangerous capabilities locked behind explicit project policy.
+It is designed for agent workflows such as Codex, Claude, Cursor, and other MCP-capable or CLI-capable AI agents that need practical Unity automation for making games.
+
+The goal is simple: make Unity game creation fast for AI agents, keep outputs production-minded by default, and keep dangerous capabilities locked behind explicit project policy.
 
 ## Why This Exists
 
-AI agents are useful inside Unity when they can do real editor work:
+AI agents are useful inside Unity when they can do real game-making work:
 
 - find and edit scene objects
 - inspect UI Canvas hierarchies
 - update components safely
 - manage prefabs and assets
+- generate gameplay scripts
+- create production-grade mobile game UI
 - capture screenshots and logs
 - prepare builds and run tests
 
-Most existing connectors prove the idea, but they often choose breadth before safety. This project starts from the opposite direction: a small trusted local core, then broader tools in layers.
+Most existing connectors prove that AI can talk to Unity, but this project is aimed at a more specific search intent: **Unity AI for making games**. It starts from a small trusted local core, then adds game-maker workflows in layers.
 
 ## Security First
 
@@ -36,14 +40,17 @@ See [docs/SECURITY.md](docs/SECURITY.md) for the complete security model.
 
 ## Current Status
 
-This repository is an early foundation. It already includes:
+This repository is an early foundation for AI-assisted Unity game creation. It already includes:
 
 - installable Unity Editor package
 - local token-protected HTTP RPC server
 - editor control tools for scenes, GameObjects, components, assets, prefabs, cameras, and Unity UI
 - game creation tools for scripts, physics, build settings, playmode, console logs, screenshots, lights, audio, and mobile controls
+- production-grade UI style presets for game menus, HUDs, buttons, joystick controls, and validation
 - dependency-free Node CLI
 - architecture, roadmap, and security docs
+
+The Unity package id is currently `com.alday.unity-ai-connector` for compatibility with existing sample projects. The public product direction is **Unity AI MCP Game Maker**.
 
 ## Repository Layout
 
@@ -240,6 +247,52 @@ node cli/unity-ai.js /path/to/UnityProject call physics.rigidbody.add '{"path":"
 node cli/unity-ai.js /path/to/UnityProject call physics.collider.add '{"path":"Player","collider":"Capsule","height":1.8,"radius":0.45}'
 node cli/unity-ai.js /path/to/UnityProject call ui.mobileControls.create '{"parentPath":"Gameplay Canvas"}'
 ```
+
+## Next Development
+
+The next development focus is to make this repository rank and behave as a practical **Unity AI game maker** for agentic coding workflows. MCP is useful as a standard protocol, but the product should not depend on MCP alone. The strongest direction is:
+
+- **Core Unity package** for safe editor-side tools.
+- **Dependency-free CLI** for Codex and terminal-first agents.
+- **MCP adapter** so Claude Desktop, Claude Code, and other MCP clients can call the same tools.
+- **Agent-friendly game workflows** that produce complete, validated game features rather than raw editor objects.
+
+Planned game-maker capabilities:
+
+1. `game.template.create`
+   Genre templates for runner, soccer, top-down, platformer, and simple shooter games, including scene structure, prefabs, scripts, camera, UI, and build settings.
+
+2. Scene role presets
+   Tools such as `scene.createMenu`, `scene.createGameplay`, `scene.createLoading`, and `scene.createGameOver` so agents can create complete game flows quickly.
+
+3. Production validators
+   Add `game.validate`, `camera.validate`, `mobile.validate`, and `build.validate` on top of `ui.validate` so generated games can be checked before playtest or build.
+
+4. Android build workflow
+   Add `build.android.configure` and `build.android.run` for package name, orientation, version, keystore placeholders, development builds, and output paths.
+
+5. Mobile input runtime tools
+   Upgrade visual joystick/buttons into runtime-ready input with `input.mobile.createController`, including touch state, movement vectors, action buttons, and generated player-controller bindings.
+
+6. Gameplay prefab kits
+   Add tools to create production-ready player, enemy, collectible, projectile, goal, spawner, checkpoint, and trigger prefabs with mesh, material, collider, rigidbody, script, and prefab save workflow.
+
+7. Screenshot review workflow
+   Add `game.reviewScreenshot` to catch blank views, invisible UI, weak contrast, layout overlap, missing main subject, and camera framing problems after `screenshot.capture`.
+
+### Positioning for AI Agents
+
+This project should be discoverable by people searching for:
+
+- Unity AI game maker
+- Unity AI MCP
+- Unity MCP server for game development
+- Unity automation for Codex
+- Claude Unity game development tools
+- AI agent Unity game builder
+- create Unity games with AI agents
+
+The technical positioning should stay honest: MCP is one integration layer, not the whole product. The durable value is the Unity game-making toolchain: safe editor control, production-grade defaults, validation, screenshots, and repeatable game workflows that any capable AI agent can use.
 
 ## Roadmap
 
