@@ -38,6 +38,26 @@ test("UnityAiClient reports unauthorized Unity responses", async () => {
   }
 });
 
+test("UnityAiClient re-reads config from a provider on every request", async () => {
+  const urls: string[] = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    urls.push(String(input));
+    return new Response(JSON.stringify({ ok: true }), { status: 200 });
+  }) as typeof fetch;
+
+  let current = config();
+  try {
+    const client = new UnityAiClient(() => current);
+    await client.health();
+    current = { ...current, baseUrl: "http://127.0.0.1:6422" };
+    await client.health();
+    assert.deepEqual(urls, ["http://127.0.0.1:6421/health", "http://127.0.0.1:6422/health"]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 function config(): ResolvedConfig {
   return {
     projectPath: "/tmp/project",

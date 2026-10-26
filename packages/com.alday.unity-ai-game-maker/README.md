@@ -206,5 +206,7 @@ Batch macros:
 
 ### 0.4.1
 
-- Stop the local HTTP server before a domain reload (script compile, entering Play Mode) and on Editor quit. Previously the old domain's listener kept the port and every authenticated call returned `Unauthorized` until the next reload.
+- Do not start the server in Asset Import Worker processes. Workers are separate Unity processes that also run `[InitializeOnLoad]`; one could hold the port and answer RPC calls (with `Unauthorized`) instead of the Editor, and its config writes raced the Editor's.
+- Stop the local HTTP server before a domain reload (script compile, entering Play Mode) and on Editor quit.
+- After starting, the server checks that its own instance answers `/health` (new `instanceId` field). If the port is taken or answered by another process, it moves to the next free port (up to 10) and saves it to `UserSettings/UnityAiGameMaker.json`. The MCP adapter now re-reads that file on every request, so it follows the move.
 - `console.read` now returns the real `condition` and `stackTrace` text. Unity 2022.3+ stores both in `LogEntry.message`; the tool now splits it at `callstackTextStartUTF16` and wraps reads in `StartGettingEntries`/`EndGettingEntries`.

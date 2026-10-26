@@ -2,7 +2,9 @@ import { McpAdapterError } from "./errors.js";
 import type { JsonObject, JsonValue, ResolvedConfig, UnityRpcResponse } from "./types.js";
 
 export class UnityAiClient {
-  constructor(private readonly config: ResolvedConfig) {}
+  // Accepts a provider so each request re-reads the config: Unity may move to another port (and save it) when
+  // its configured port is still held by a listener from a previous domain reload.
+  constructor(private readonly config: ResolvedConfig | (() => ResolvedConfig)) {}
 
   async health(): Promise<JsonValue> {
     return this.request("/health");
@@ -28,16 +30,17 @@ export class UnityAiClient {
   }
 
   private async request(path: string, options: RequestOptions = {}): Promise<JsonValue> {
+    const config = typeof this.config === "function" ? this.config() : this.config;
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.config.timeoutMs);
+    const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
 
     try {
       const headers: Record<string, string> = { ...(options.headers ?? {}) };
-      if (options.authorized && this.config.authRequired && this.config.token) {
-        headers.Authorization = `Bearer ${this.config.token}`;
+      if (options.authorized && config.authRequired && config.token) {
+        headers.Authorization = `Bearer ${config.token}`;
       }
 
-      const response = await fetch(`${this.config.baseUrl}${path}`, {
+      const response = await fetch(`${config.baseUrl}${path}`, {
         method: options.method ?? "GET",
         headers,
         body: options.body,
@@ -61,11 +64,11 @@ export class UnityAiClient {
       }
 
       if (error instanceof Error && error.name === "AbortError") {
-        throw new McpAdapterError(`Unity request timed out after ${this.config.timeoutMs}ms.`, "UNITY_TIMEOUT");
+        throw new McpAdapterError(`Unity request timed out after ${config.timeoutMs}ms.`, "UNITY_TIMEOUT");
       }
 
       throw new McpAdapterError(
-        `Unable to reach Unity at ${this.config.baseUrl}. Is the Unity Editor open and the server running?`,
+        `Unable to reach Unity at ${config.baseUrl}. Is the Unity Editor open and the server running?`,
         "UNITY_UNREACHABLE",
         error
       );

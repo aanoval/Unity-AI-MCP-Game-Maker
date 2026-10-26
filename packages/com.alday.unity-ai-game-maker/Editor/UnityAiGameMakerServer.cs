@@ -19,8 +19,20 @@ namespace Alday.UnityAiGameMaker.Editor
         static bool isRunning;
         static UnityAiGameMakerConfig config;
 
+        // Unique per domain, so the self-check can tell our listener apart from one left over from an earlier domain.
+        static readonly string InstanceId = Guid.NewGuid().ToString("N");
+        const int PortFallbackAttempts = 10;
+        const int ProbeTimeoutMs = 2000;
+        const int OwnershipProbes = 3;
+
         static UnityAiGameMakerServer()
         {
+            // Asset import workers are separate Unity processes that also run [InitializeOnLoad]. A server started
+            // there grabs the port and answers RPC calls without being the Editor the user works in, and its
+            // LoadOrCreate() races the Editor's writes to the config file (and can rotate the token).
+            if (AssetDatabase.IsAssetImportWorkerProcess())
+                return;
+
             config = UnityAiGameMakerConfig.LoadOrCreate();
             EditorApplication.update += UnityAiMainThread.Pump;
             // Release the port before a domain reload (script compile, entering Play Mode); otherwise the old
@@ -75,19 +87,102 @@ namespace Alday.UnityAiGameMaker.Editor
                 return;
             }
 
-            listener = new HttpListener();
-            listener.Prefixes.Add($"http://{config.bindHost}:{config.port}/");
-            listener.Start();
+            StartOn(config.port, config.port);
+        }
 
+        static void StartOn(int port, int configuredPort)
+        {
+            for (; port < configuredPort + PortFallbackAttempts && port <= 65535; port++)
+            {
+                if (!TryBind(port))
+                    continue;
+
+                // The self-check has to wait until the domain has finished loading: during [InitializeOnLoad] the
+                // listener's worker threads cannot enter the new domain yet, so a synchronous probe always times out.
+                var started = listener;
+                var startedPort = port;
+                EditorApplication.delayCall += () => VerifyOwnership(started, startedPort, configuredPort);
+                return;
+            }
+
+            Debug.LogError($"Unity AI Game Maker could not start on ports {configuredPort}-{configuredPort + PortFallbackAttempts - 1}. Set a free \"port\" in {UnityAiGameMakerConfig.ConfigPath} and use Tools > Unity AI Game Maker > Start Local Server.");
+        }
+
+        static bool TryBind(int port)
+        {
+            var candidate = new HttpListener();
+            candidate.Prefixes.Add($"http://{config.bindHost}:{port}/");
+            try
+            {
+                candidate.Start();
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"Unity AI Game Maker could not bind port {port}: {ex.Message}");
+                candidate.Close();
+                return false;
+            }
+
+            listener = candidate;
             isRunning = true;
-            serverThread = new Thread(ServerLoop)
+            serverThread = new Thread(() => ServerLoop(candidate))
             {
                 IsBackground = true,
                 Name = "unity-ai-game-maker"
             };
             serverThread.Start();
+            return true;
+        }
 
-            Debug.Log($"Unity AI Game Maker listening on http://{config.bindHost}:{config.port}");
+        static void VerifyOwnership(HttpListener started, int port, int configuredPort)
+        {
+            if (listener != started)
+                return;
+
+            // HttpListener.Start() can return without error while a listener left over from a previous domain
+            // still owns the socket and answers with its stale token. Only keep the port if our own instance answers
+            // every probe (several, in case the OS spreads connections across sockets sharing the port).
+            var owned = true;
+            for (var probe = 0; probe < OwnershipProbes && owned; probe++)
+                owned = ProbeOwnsPort(port);
+
+            if (!owned)
+            {
+                Debug.LogWarning($"Unity AI Game Maker: port {port} is answered by another listener (a stale server from a previous domain reload, or another Editor). Trying the next port.");
+                Stop();
+                StartOn(port + 1, configuredPort);
+                return;
+            }
+
+            if (port != configuredPort)
+            {
+                // The CLI and MCP adapter read the port from the config file, so they follow the move.
+                config.port = port;
+                config.Save();
+                Debug.LogWarning($"Unity AI Game Maker moved from port {configuredPort} to {port} and saved it to {UnityAiGameMakerConfig.ConfigPath}.");
+            }
+
+            Debug.Log($"Unity AI Game Maker listening on http://{config.bindHost}:{port}");
+        }
+
+        static bool ProbeOwnsPort(int port)
+        {
+            try
+            {
+                var request = (HttpWebRequest)WebRequest.Create($"http://{config.bindHost}:{port}/health");
+                request.Proxy = null;
+                request.Timeout = ProbeTimeoutMs;
+                request.ReadWriteTimeout = ProbeTimeoutMs;
+                using var response = (HttpWebResponse)request.GetResponse();
+                using var reader = new StreamReader(response.GetResponseStream() ?? Stream.Null, Encoding.UTF8);
+                var health = JObject.Parse(reader.ReadToEnd());
+                return health.Value<string>("instanceId") == InstanceId;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"Unity AI Game Maker self-check on port {port} failed: {ex.Message}");
+                return false;
+            }
         }
 
         public static void Stop()
@@ -109,13 +204,13 @@ namespace Alday.UnityAiGameMaker.Editor
             }
         }
 
-        static void ServerLoop()
+        static void ServerLoop(HttpListener owned)
         {
-            while (isRunning && listener != null)
+            while (isRunning && listener == owned)
             {
                 try
                 {
-                    var context = listener.GetContext();
+                    var context = owned.GetContext();
                     ThreadPool.QueueUserWorkItem(_ => Handle(context));
                 }
                 catch
@@ -141,6 +236,7 @@ namespace Alday.UnityAiGameMaker.Editor
                         ok = true,
                         name = "Unity AI Game Maker",
                         version = "0.4.1",
+                        instanceId = InstanceId,
                         bindHost = config.bindHost,
                         port = config.port,
                         authRequired = config.authRequired
