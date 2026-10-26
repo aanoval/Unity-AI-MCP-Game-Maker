@@ -14,7 +14,7 @@ import { UnityAiClient } from "./unity-client.js";
 async function main(): Promise<void> {
   const options = parseCliOptions(process.argv.slice(2));
   const config = resolveConfig(options);
-  const client = new UnityAiClient(config);
+  const client = new UnityAiClient(() => resolveConfig(options));
 
   const server = new Server(
     {
