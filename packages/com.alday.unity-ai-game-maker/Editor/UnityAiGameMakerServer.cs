@@ -23,6 +23,10 @@ namespace Alday.UnityAiGameMaker.Editor
         {
             config = UnityAiGameMakerConfig.LoadOrCreate();
             EditorApplication.update += UnityAiMainThread.Pump;
+            // Release the port before a domain reload (script compile, entering Play Mode); otherwise the old
+            // domain's listener keeps answering with stale state and calls fail with Unauthorized.
+            AssemblyReloadEvents.beforeAssemblyReload += Stop;
+            EditorApplication.quitting += Stop;
 
             if (config.autoStart)
                 Start();
@@ -136,7 +140,7 @@ namespace Alday.UnityAiGameMaker.Editor
                     {
                         ok = true,
                         name = "Unity AI Game Maker",
-                        version = "0.4.0",
+                        version = "0.4.1",
                         bindHost = config.bindHost,
                         port = config.port,
                         authRequired = config.authRequired

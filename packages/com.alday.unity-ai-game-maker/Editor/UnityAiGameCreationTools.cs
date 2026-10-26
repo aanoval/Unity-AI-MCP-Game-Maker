@@ -151,24 +151,66 @@ namespace Alday.UnityAiGameMaker.Editor
             if (getCount == null || getEntry == null)
                 return new { supported = false, entries };
 
-            var count = (int)getCount.Invoke(null, null);
-            var start = Math.Max(0, count - limit);
-            for (var i = start; i < count; i++)
+            // GetEntryInternal only fills entries between StartGettingEntries/EndGettingEntries.
+            var startGetting = logEntries.GetMethod("StartGettingEntries", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+            var endGetting = logEntries.GetMethod("EndGettingEntries", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+            startGetting?.Invoke(null, null);
+            int count;
+            try
             {
-                var entry = Activator.CreateInstance(logEntry);
-                getEntry.Invoke(null, new[] { (object)i, entry });
-                entries.Add(new
+                count = (int)getCount.Invoke(null, null);
+                var start = Math.Max(0, count - limit);
+                for (var i = start; i < count; i++)
                 {
-                    index = i,
-                    condition = ReadField<string>(logEntry, entry, "condition"),
-                    stackTrace = ReadField<string>(logEntry, entry, "stackTrace"),
-                    file = ReadField<string>(logEntry, entry, "file"),
-                    line = ReadField<int>(logEntry, entry, "line"),
-                    mode = ReadField<int>(logEntry, entry, "mode")
-                });
+                    var entry = Activator.CreateInstance(logEntry);
+                    getEntry.Invoke(null, new[] { (object)i, entry });
+                    SplitLogMessage(logEntry, entry, out var condition, out var stackTrace);
+                    entries.Add(new
+                    {
+                        index = i,
+                        condition,
+                        stackTrace,
+                        file = ReadField<string>(logEntry, entry, "file"),
+                        line = ReadField<int>(logEntry, entry, "line"),
+                        mode = ReadField<int>(logEntry, entry, "mode")
+                    });
+                }
+            }
+            finally
+            {
+                endGetting?.Invoke(null, null);
             }
 
             return new { supported = true, count, entries };
+        }
+
+        // Unity 2022.3+ keeps the condition and stack trace together in LogEntry.message, with the stack
+        // trace starting at callstackTextStartUTF16. Older editors exposed separate condition/stackTrace fields.
+        static void SplitLogMessage(Type logEntry, object entry, out string condition, out string stackTrace)
+        {
+            var message = ReadField<string>(logEntry, entry, "message");
+            if (message == null)
+            {
+                condition = ReadField<string>(logEntry, entry, "condition");
+                stackTrace = ReadField<string>(logEntry, entry, "stackTrace");
+                return;
+            }
+
+            var split = -1;
+            if (logEntry.GetField("callstackTextStartUTF16", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic) != null)
+                split = ReadField<int>(logEntry, entry, "callstackTextStartUTF16");
+            if (split <= 0 || split > message.Length)
+                split = message.IndexOf('\n');
+
+            if (split <= 0 || split >= message.Length)
+            {
+                condition = message.TrimEnd('\n', '\r');
+                stackTrace = string.Empty;
+                return;
+            }
+
+            condition = message.Substring(0, split).TrimEnd('\n', '\r');
+            stackTrace = message.Substring(split).TrimStart('\n', '\r');
         }
 
         public static object CaptureScreenshot(JObject args) => UnityAiScreenshotTools.Capture(args);
